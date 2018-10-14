@@ -44,3 +44,5 @@ dockerRepository := Some("192.168.1.198:5000")
 dockerBaseImage := scala.util.Properties.envOrElse("DOCKER_IMAGE", "openjdk:latest")
 
 packageName in Docker := scala.util.Properties.envOrElse("DOCKER_PACKAGE_NAME", packageName.value)
+
+scalacOptions in (Compile, console) := Seq("without -Ywarn-unused-imports")
