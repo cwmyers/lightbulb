@@ -1,6 +1,7 @@
 package app
 
 import java.nio.charset.StandardCharsets
+import java.time.Instant
 import java.util.Base64
 
 import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence
@@ -9,52 +10,56 @@ import org.eclipse.paho.client.mqttv3.{MqttClient, MqttConnectOptions, MqttMessa
 import scala.util.{Failure, Success, Try}
 
 object Main {
+  val tuyaApiVersion = "2.1"
+  type ErrorOr[A] = Either[Throwable, A]
 
   def main(args: Array[String]): Unit = {
 
-    val lightbulbTopic = sys.env.getOrElse("TEMP_SENSOR_TOPIC", "smart/device/out/042000665ccf7f7bc4da")
-    val localKey = "cb67818210934165"
-    val thermoCurrentTempTopic = sys.env.getOrElse("THERMO_CURRENT_TEMP_TOPIC", "/kitchenThermostat/currentTemp")
-    val thermoTargetTempTopic = sys.env.getOrElse("THERMO_TARGET_TEMP_TOPIC", "/kitchenThermostat/targetTemp")
-    val thermoGetTargetTempTopic = sys.env.getOrElse("THERMO_GET_TARGET_TEMP_TOPIC", "/kitchenThermostat/getTargetTemp")
-    val currentHeatingCoolingTopic = sys.env.getOrElse("CURRENT_HEATING_COOLING_TOPIC", "/kitchenThermostat/currentHeatingCoolingState")
-    val clientId = sys.env.getOrElse("CLIENT_ID", "Kitchen Thermostat")
-    val heaterTopics: List[String] = sys.env.get("HEATER_TOPICS").map(_.split(",").toList).getOrElse(List.empty)
+    val deviceId = sys.env.getOrElse("DEV_ID","042000665ccf7f7bc4da")
+    val lightbulbTopicOut = s"smart/device/out/$deviceId"
+    val lightbulbTopicIn = s"smart/device/in/$deviceId"
+    val lightbridgeTopic = s"lightbridge/$deviceId"
+    val commandTopic = s"$lightbridgeTopic/command"
+//    val statusTopic = s"$lightbridgeTopic/status"
 
-    println(s"Heater Topics $heaterTopics")
-    println(s"TEMP_SENSOR_TOPIC: $lightbulbTopic")
-    println(s"THERMO_CURRENT_TEMP_TOPIC: $thermoCurrentTempTopic")
-    println(s"THERMO_TARGET_TEMP_TOPIC: $thermoTargetTempTopic")
-    println(s"THERMO_GET_TARGET_TEMP_TOPIC: $thermoGetTargetTempTopic")
-    println(s"CURRENT_HEATING_COOLING_TOPIC: $currentHeatingCoolingTopic")
-
-
-    val broker = "tcp://192.168.1.198:1883"
-    val persistence: MemoryPersistence = new MemoryPersistence()
+    val localKey = sys.env.getOrElse("LOCAL_KEY", "XXXX")
+    val clientId = sys.env.getOrElse("CLIENT_ID", s"Light $deviceId")
+    println(s"TEMP_SENSOR_TOPIC: $lightbulbTopicOut")
 
     Try {
-      val mqttClient = new MqttClient(broker, clientId, persistence)
-      val connOpts = new MqttConnectOptions()
-      connOpts.setCleanSession(true)
-      connOpts.setAutomaticReconnect(true)
-      connOpts.setConnectionTimeout(0)
-      println("Connecting to broker: " + broker)
-      mqttClient.connect(connOpts)
-      println("Connected")
+      val mqttClient: MqttClient = createClient(clientId)
 
-      mqttClient.subscribe(lightbulbTopic, 2, (topic: String, message: MqttMessage) => {
+      mqttClient.subscribe(lightbulbTopicOut, 2, (topic: String, message: MqttMessage) => {
         val currentState = new String(message.getPayload, StandardCharsets.UTF_8)
 
-        val bytes = Base64.getDecoder.decode(message.getPayload)
-
-        decrypt(localKey, bytes)
-
-        println(currentState)
+        process(localKey, currentState).foreach(println)
       }
+
       )
 
+      mqttClient.subscribe(s"$commandTopic/on", 2, (topic: String, message: MqttMessage) => {
+        val status = new String(message.getPayload)
+        println(status)
+        val command = s"""{"1":$status}"""
+        publishCommand(mqttClient, command)
+      })
+      mqttClient.subscribe(s"$commandTopic/rgbw", 2, (topic: String, message: MqttMessage) => {
+        val status = new String(message.getPayload).substring(1)
+        println(status)
+        val command = s"""{"2":"colour","5":"${status}ebffff"}"""
+        publishCommand(mqttClient, command)
+      })
+
+      mqttClient.subscribe(s"$commandTopic/rgb", 2, (topic: String, message: MqttMessage) => {
+        val status = new String(message.getPayload).substring(1)
+        println(status)
+        val command = s"""{"2":"colour","5":"${status}ebffff"}"""
+        publishCommand(mqttClient, command)
+      })
+
       while (true) {
-        Thread.sleep(60 * 1000)
+        Thread.sleep(6 * 1000)
+
       }
       mqttClient.disconnect()
       println("Disconnected")
@@ -63,16 +68,35 @@ object Main {
       case Failure(e) => println(e.getMessage)
     }
 
-    // def publishState(client: MqttClient, currentTemp: Float, targetTemp: Float, mode: Mode): Unit = {
-    //   client.publish(thermoCurrentTempTopic, createMessage(currentTemp.toString))
-    //   client.publish(currentHeatingCoolingTopic, createMessage(mode.asNumber))
-    //   heaterTopics.foreach{ topic => client.publish(topic, createMessage(mode.asValue))}
-    //   println(s"currentTemp = $currentTemp targetTemp = $targetTemp heating = $mode")
-    // }
+    def publishCommand(client: MqttClient, message: String) = {
+      readyToSend(deviceId, localKey, message).foreach(m =>
+        client.publish(lightbulbTopicIn, createMessage(m,retained = false))
+      )
+    }
 
   }
 
-  def createMessage(message: String): MqttMessage = {
+
+
+  def readyToSend(deviceId: String, localKey: String, command: String) = {
+    encryptMessage(createTuyaMessage(deviceId, command), localKey)
+  }
+
+  def createClient(clientId: String) = {
+    val broker = "tcp://192.168.1.198:1883"
+    val persistence: MemoryPersistence = new MemoryPersistence()
+    val mqttClient = new MqttClient(broker, clientId, persistence)
+    val connOpts = new MqttConnectOptions()
+    connOpts.setCleanSession(true)
+    connOpts.setAutomaticReconnect(true)
+    connOpts.setConnectionTimeout(0)
+    println("Connecting to broker: " + broker)
+    mqttClient.connect(connOpts)
+    println("Connected")
+    mqttClient
+  }
+
+  def createMessage(message: String, retained:Boolean=true): MqttMessage = {
     val m = new MqttMessage(message.getBytes)
     m.setRetained(true)
     m
@@ -82,30 +106,28 @@ object Main {
   import javax.crypto.Cipher
   import javax.crypto.spec.SecretKeySpec
 
-  def process(localKey: String, message:String): String = {
-    val payload = message.substring(3+16)
+  def process(localKey: String, message: String): ErrorOr[String] = {
+    val payload = message.substring(tuyaApiVersion.length + 16)
     val bytes = Base64.getDecoder.decode(payload.getBytes)
     decrypt(localKey, bytes)
-
   }
 
-  @throws[Exception]
-  def encrypt(secretKey: String, data: String): String = {
+  def encrypt(secretKey: String, data: String): ErrorOr[String] = Try {
     val key = new SecretKeySpec(secretKey.getBytes("UTF-8"), "AES")
     val c = Cipher.getInstance("AES")
     c.init(Cipher.ENCRYPT_MODE, key)
     val encVal = c.doFinal(data.getBytes)
     new String(Base64.getEncoder.encode(encVal))
-  }
+  }.toEither
 
-  def decrypt(secretKey: String, data: Array[Byte]): String = {
+  def decrypt(secretKey: String, data: Array[Byte]): ErrorOr[String] = Try {
     val key = new SecretKeySpec(secretKey.getBytes("UTF-8"), "AES")
     val c = Cipher.getInstance("AES")
     c.init(Cipher.DECRYPT_MODE, key)
     val decVal: Array[Byte] = c.doFinal(data)
 
     new String(decVal, StandardCharsets.UTF_8)
-  }
+  }.toEither
 
   def byte2hex(b: Array[Byte]): String = {
     var hs = ""
@@ -127,14 +149,13 @@ object Main {
   }
 
 
-  def digest(message: String) = {
+  def digest(message: String): ErrorOr[String] = Try {
     import java.security.MessageDigest
     val e = MessageDigest.getInstance("MD5")
     e.update(message.getBytes)
     val tmp = e.digest()
     byte2hex(tmp)
-
-  }
+  }.toEither
 
   def buildDataToHash(data: String, key: String): String =
     s"data=$data||pv=2.1||$key"
@@ -145,16 +166,16 @@ object Main {
 
   def sliceHash(md5Hash: String): String = md5Hash.slice(8, 24)
 
-  def encryptMessage(message: String, localKey: String): String = {
-    val encryptedMessage = encrypt(localKey, message)
-    val md5 = digest(buildDataToHash(encryptedMessage, localKey))
-    buildPayload(encryptedMessage, md5)
-  }
+  def encryptMessage(message: String, localKey: String): ErrorOr[String] =
+    for {
+      encryptedMessage <- encrypt(localKey, message)
+      md5 <- digest(buildDataToHash(encryptedMessage, localKey))
+    } yield buildPayload(encryptedMessage, md5.toLowerCase)
+
 
   import java.security.MessageDigest
 
-  @throws[Exception]
-  def getMD5(source: Array[Byte]): String = {
+  def getMD5(source: Array[Byte]): ErrorOr[String] = Try {
 
     val hexDigits = Array('0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f')
     val e = MessageDigest.getInstance("MD5")
@@ -183,26 +204,13 @@ object Main {
     }
     new String(str)
 
+  }.toEither
+
+  def createTuyaMessage(deviceId: String, payload: String): String = {
+    val timestamp = Instant.now.getEpochSecond
+    val sequence = 0
+    s"""{"data":{"devId":"$deviceId","dps":$payload},"protocol":5,"s":$sequence,"t":$timestamp}"""
   }
 
 }
 
-case class State(currentTemp: Float, targetTemp: Float)
-
-sealed trait Mode {
-  def asNumber: String
-
-  def asValue: String
-}
-
-case object On extends Mode {
-  def asNumber = "1"
-
-  def asValue = "ON"
-}
-
-case object Off extends Mode {
-  def asNumber = "0"
-
-  def asValue = "OFF"
-}
