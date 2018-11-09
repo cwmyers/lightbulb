@@ -4,21 +4,32 @@ import java.nio.charset.StandardCharsets
 import java.time.Instant
 
 import app.tuya.TuyaApi._
+import io.circe.Decoder
+import io.circe.generic.auto._
+import io.circe.parser.decode
 import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence
 import org.eclipse.paho.client.mqttv3.{MqttClient, MqttConnectOptions, MqttMessage}
 
 import scala.util.{Failure, Success, Try}
 
+
+case class Dps(status: Option[Boolean], colourType: Option[String], colourValue: Option[String])
+
+case class Data(devId: String, dps: Dps)
+
+case class Structure(protocol: Int, t: Long, data: Data)
+
 object Main {
+  implicit val dpsDecoder = Decoder.forProduct3("1", "3", "5")(Dps.apply)
 
   def main(args: Array[String]): Unit = {
 
-    val deviceId = sys.env.getOrElse("DEV_ID","042000665ccf7f7bc4da")
+    val deviceId = sys.env.getOrElse("DEV_ID", "042000665ccf7f7bc4da")
     val lightbulbTopicOut = s"smart/device/out/$deviceId"
     val lightbulbTopicIn = s"smart/device/in/$deviceId"
     val lightbridgeTopic = s"lightbridge/$deviceId"
     val commandTopic = s"$lightbridgeTopic/command"
-//    val statusTopic = s"$lightbridgeTopic/status"
+    val statusTopic = s"$lightbridgeTopic/status"
 
     val localKey = sys.env.getOrElse("LOCAL_KEY", "XXXX")
     val clientId = sys.env.getOrElse("CLIENT_ID", s"Light $deviceId")
@@ -29,7 +40,24 @@ object Main {
       mqttClient.subscribe(lightbulbTopicOut, 2, (_: String, message: MqttMessage) => {
         val currentState = new String(message.getPayload, StandardCharsets.UTF_8)
 
-        process(localKey, currentState).foreach(println)
+        process(localKey, currentState).flatMap {
+          message =>
+            decode[Structure](message)
+        }.foreach {
+          structure =>
+            structure.data.dps.status.foreach {
+              status => mqttClient.publish(s"$statusTopic/on", createMessage(status.toString.toLowerCase))
+            }
+            structure.data.dps.colourValue.foreach{
+              colourValue =>
+                val red = Integer.parseInt(colourValue.substring(0,2),16)
+                val green = Integer.parseInt(colourValue.substring(2,4), 16)
+                val blue = Integer.parseInt(colourValue.substring(4,6),16)
+                mqttClient.publish(s"$statusTopic/rgb", createMessage(s"$red,$green,$blue"))
+
+            }
+        }
+
       }
 
       )
@@ -48,7 +76,7 @@ object Main {
         val g = toHex(colours(1))
         val b = toHex(colours(2))
         val w = toHex(colours(3))
-        val command = s"""{"2":"colour","3":255,"4":255,"5":"${r}${g}${b}ffff$w$w"}"""
+        val command = s"""{"2":"colour","3":255,"4":255,"5":"$r$g${b}ffff$w$w"}"""
         println(command)
         publishCommand(mqttClient, command)
       })
@@ -89,13 +117,13 @@ object Main {
 
     def publishCommand(client: MqttClient, message: String) = {
       readyToSend(deviceId, localKey, message).foreach(m =>
-        client.publish(lightbulbTopicIn, createMessage(m,retained = false))
+        client.publish(lightbulbTopicIn, createMessage(m, retained = false))
       )
     }
 
   }
 
-  def toHex(s:String) = f"${s.toInt}%02x"
+  def toHex(s: String) = f"${s.toInt}%02x"
 
   def readyToSend(deviceId: String, localKey: String, command: String) = {
     encryptMessage(createTuyaMessage(deviceId, command), localKey)
@@ -115,12 +143,11 @@ object Main {
     mqttClient
   }
 
-  def createMessage(message: String, retained:Boolean=true): MqttMessage = {
+  def createMessage(message: String, retained: Boolean = true): MqttMessage = {
     val m = new MqttMessage(message.getBytes)
     m.setRetained(true)
     m
   }
-
 
 
   def createTuyaMessage(deviceId: String, payload: String): String = {

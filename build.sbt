@@ -15,7 +15,8 @@ scalacOptions ++= Seq(
   "-language:higherKinds"
 )
 
-val circeVersion = "0.8.0"
+val circeVersion = "0.10.0"
+
 
 val specs2Version = "3.9.2"
 
@@ -29,13 +30,18 @@ libraryDependencies ++= Seq(
   "org.eclipse.paho" % "org.eclipse.paho.client.mqttv3" % "1.0.2",
   "commons-codec" % "commons-codec" % "1.11",
   "org.typelevel" %% "cats-core" % "1.4.0",
-  "org.specs2"          %% "specs2-core"            % specs2Version % "test"
-  )
+  "io.circe" %% "circe-core" % circeVersion,
+  "io.circe" %% "circe-generic" % circeVersion,
+  "io.circe" %% "circe-parser" % circeVersion,
+  "org.specs2" %% "specs2-core" % specs2Version % "test"
+)
+
+
 
 
 mainClass in Compile := Some("app.Main") //Used in Universal packageBin
 
-mainClass in (Compile, run) := Some("app.Main") //Used from normal sbt
+mainClass in(Compile, run) := Some("app.Main") //Used from normal sbt
 
 
 enablePlugins(JavaServerAppPackaging, DockerPlugin)
@@ -46,4 +52,4 @@ dockerBaseImage := scala.util.Properties.envOrElse("DOCKER_IMAGE", "openjdk:late
 
 packageName in Docker := scala.util.Properties.envOrElse("DOCKER_PACKAGE_NAME", packageName.value)
 
-scalacOptions in (Compile, console) := Seq("without -Ywarn-unused-imports")
+scalacOptions in(Compile, console) := Seq("without -Ywarn-unused-imports")
