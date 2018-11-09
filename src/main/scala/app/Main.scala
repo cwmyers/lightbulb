@@ -44,16 +44,38 @@ object Main {
         publishCommand(mqttClient, command)
       })
       mqttClient.subscribe(s"$commandTopic/rgbw", 2, (topic: String, message: MqttMessage) => {
-        val status = new String(message.getPayload).substring(1)
+        val status = new String(message.getPayload)
         println(status)
-        val command = s"""{"2":"colour","5":"${status}ebffff"}"""
+        val colours = status.split(",")
+        val r = toHex(colours(0))
+        val g = toHex(colours(1))
+        val b = toHex(colours(2))
+        val w = toHex(colours(3))
+        val command = s"""{"2":"colour","3":255,"4":255,"5":"${r}${g}${b}ffff$w$w"}"""
+        println(command)
         publishCommand(mqttClient, command)
       })
 
       mqttClient.subscribe(s"$commandTopic/rgb", 2, (topic: String, message: MqttMessage) => {
-        val status = new String(message.getPayload).substring(1)
+        val status = new String(message.getPayload)
         println(status)
-        val command = s"""{"2":"colour","5":"${status}ebffff"}"""
+        val colours = status.split(",")
+        val r = toHex(colours(0))
+        val g = toHex(colours(1))
+        val b = toHex(colours(2))
+        val command = s"""{"2":"colour","5":"${r}${g}${b}ffffffff"}"""
+        publishCommand(mqttClient, command)
+      })
+
+      mqttClient.subscribe(s"$commandTopic/hsl", 2, (topic: String, message: MqttMessage) => {
+        val status = new String(message.getPayload)
+        println(status)
+        val hsl = status.split(",")
+        val hue = hsl(0)
+        val sat = hsl(1)
+        val lum = hsl(2)
+        val command = s"""{"2":"colour","5":"${hue.toInt.toHexString}${sat.toInt.toHexString}${lum.toInt.toHexString}0000${lum.toInt.toHexString}ff"}"""
+        println(command)
         publishCommand(mqttClient, command)
       })
 
@@ -76,7 +98,7 @@ object Main {
 
   }
 
-
+  def toHex(s:String) = f"${s.toInt}%02x"
 
   def readyToSend(deviceId: String, localKey: String, command: String) = {
     encryptMessage(createTuyaMessage(deviceId, command), localKey)
@@ -213,4 +235,3 @@ object Main {
   }
 
 }
-
