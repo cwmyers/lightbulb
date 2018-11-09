@@ -13,12 +13,11 @@ scalacOptions ++= Seq(
   "-unchecked",
   "-feature",
   "-language:higherKinds"
-//    "-Xlog-implicits"
 )
 
-val unfilteredLibraryVersion = "0.9.1"
-
 val circeVersion = "0.8.0"
+
+val specs2Version = "3.9.2"
 
 resolvers += "paho" at "https://repo.eclipse.org/content/repositories/paho-releases/"
 
@@ -28,7 +27,9 @@ resolvers += "paho" at "https://repo.eclipse.org/content/repositories/paho-relea
 libraryDependencies ++= Seq(
   "com.lightbend.akka" %% "akka-stream-alpakka-mqtt" % "0.20",
   "org.eclipse.paho" % "org.eclipse.paho.client.mqttv3" % "1.0.2",
-  "commons-codec" % "commons-codec" % "1.11"
+  "commons-codec" % "commons-codec" % "1.11",
+  "org.typelevel" %% "cats-core" % "1.4.0",
+  "org.specs2"          %% "specs2-core"            % specs2Version % "test"
   )
 
 
