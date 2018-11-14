@@ -7,6 +7,7 @@ scalaVersion := "2.12.4"
 scalacOptions ++= Seq(
   "-Xfatal-warnings",
   "-Ywarn-unused-import",
+  "-Ypartial-unification",
   "-Xlint",
   "-feature",
   "-deprecation",
@@ -15,6 +16,10 @@ scalacOptions ++= Seq(
   "-language:higherKinds"
 )
 
+resolvers += Resolver.sonatypeRepo("releases")
+
+addCompilerPlugin("org.spire-math" %% "kind-projector" % "0.9.8")
+
 val circeVersion = "0.10.0"
 
 
@@ -22,14 +27,13 @@ val specs2Version = "3.9.2"
 
 resolvers += "paho" at "https://repo.eclipse.org/content/repositories/paho-releases/"
 
-//addCompilerPlugin("org.scalamacros" % "paradise" % "2.1.0" cross CrossVersion.full)
-
 
 libraryDependencies ++= Seq(
   "com.lightbend.akka" %% "akka-stream-alpakka-mqtt" % "0.20",
   "org.eclipse.paho" % "org.eclipse.paho.client.mqttv3" % "1.0.2",
   "commons-codec" % "commons-codec" % "1.11",
   "org.typelevel" %% "cats-core" % "1.4.0",
+  "org.typelevel" %% "cats-effect" % "1.0.0",
   "io.circe" %% "circe-core" % circeVersion,
   "io.circe" %% "circe-generic" % circeVersion,
   "io.circe" %% "circe-parser" % circeVersion,
