@@ -12,7 +12,7 @@ object Util {
 
   def unsafeConvert(f: (String, MqttMessage) => IO[Unit]): IMqttMessageListener = {
     (topic: String, message: MqttMessage) => {
-      f(topic, message).unsafeRunSync()
+      try {f(topic, message).unsafeRunSync()} catch { case e: Throwable => println(e)}
     }
   }
 

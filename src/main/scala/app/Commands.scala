@@ -49,14 +49,14 @@ trait Commands[F[_]] extends Codecs {
 
       val onStatus = for {
         structure <- maybeStructure
-        status <- liftFromOption[F](structure.data.dps.status, new RuntimeException("Empty Value"))
+        status <- liftFromOption[F](structure.data.dps.status, new RuntimeException("Empty Status Value"))
         message <- createMessageF[F](status.toString.toLowerCase)
         _ <- publishMessageToMqtt[F](mqttClient, s"$statusTopic/on")(message)
       } yield ()
 
       val colourStatus = for {
         structure <- maybeStructure
-        colour <- liftFromOption[F](structure.data.dps.colourValue, new RuntimeException("Empty Value"))
+        colour <- liftFromOption[F](structure.data.dps.colourValue, new RuntimeException("Empty Colour Value"))
         message <- processColour(colour)
         _ <- publishMessageToMqtt[F](mqttClient, s"$statusTopic/rgb")(message)
       } yield ()
@@ -81,4 +81,3 @@ trait Commands[F[_]] extends Codecs {
 
 
 }
-
