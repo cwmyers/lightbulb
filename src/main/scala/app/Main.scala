@@ -1,36 +1,43 @@
 package app
 
 import app.Communication.getCommandTopic
-import app.Util.unsafeConvert
+import app.Util.{decodeF, unsafeConvert}
+import app.codecs.Codecs
 import app.model._
-import app.mqtt.MqttApi
-import cats.effect.IO
+import app.mqtt.MqttApi.createClientF
+import cats.effect.{IO, Sync}
 import cats.implicits._
+import io.circe.generic.auto._
+import org.eclipse.paho.client.mqttv3.MqttClient
 
-object Main {
+import scala.io.Source
 
+object Main extends Codecs {
 
   def main(args: Array[String]): Unit = {
-    val lightbulbs = Vector[Lightbulb](
-      Lightbulb(DeviceId("042000665ccf7f7bc4da"), LocalKey("34e68ce080dbdf1b"))
-    )
 
     val clientId = sys.env.getOrElse("CLIENT_ID", s"Lightbridge")
+    type Eff[A] = IO[A]
 
+    val program = for {
+      jsonInput <- Sync[Eff].delay(Source.fromFile("config.json").mkString)
+      config <- decodeF[Eff, Config](jsonInput)
+      mqttClient <- createClientF[Eff](clientId)
+      _ <- config.lightbulbs.traverse[Eff, Unit] { l => wireUpListeners(l, mqttClient) }
+    } yield ()
+
+    program.unsafeRunSync()
+
+  }
+
+  def wireUpListeners(l: Lightbulb, mqttClient: MqttClient): IO[Unit] = {
     object Commands extends Commands[IO]
 
     import Commands._
 
-    MqttApi.createClientF[IO](clientId).flatMap { mqttClient =>
-
-      lightbulbs.traverse { l =>
-        IO.delay(mqttClient.subscribe(getSmartOutTopic(l.deviceId), 2, unsafeConvert(handleUpdateMessage(l, mqttClient)))) *>
-          IO.delay(mqttClient.subscribe(s"${getCommandTopic(l.deviceId)}/on", 2, unsafeConvert(handleOnMessages(l, mqttClient)))) *>
-          IO.delay(mqttClient.subscribe(s"${getCommandTopic(l.deviceId)}/rgb", 2, unsafeConvert(handleRgbMessage(l, mqttClient))))
-      }
-
-    }.unsafeRunSync()
-
+    IO.delay(mqttClient.subscribe(getSmartOutTopic(l.deviceId), 2, unsafeConvert(handleUpdateMessage(l, mqttClient)))) *>
+      IO.delay(mqttClient.subscribe(s"${getCommandTopic(l.deviceId)}/on", 2, unsafeConvert(handleOnMessages(l, mqttClient)))) *>
+      IO.delay(mqttClient.subscribe(s"${getCommandTopic(l.deviceId)}/rgb", 2, unsafeConvert(handleRgbMessage(l, mqttClient))))
   }
 
 

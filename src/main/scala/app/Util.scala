@@ -1,7 +1,7 @@
 package app
 
-import app.tuya.Transport.HasError
-import cats.MonadError
+import app.tuya.Transport.HasErrorA
+import cats.ApplicativeError
 import cats.effect.IO
 import io.circe.Decoder
 import io.circe.parser.decode
@@ -16,7 +16,7 @@ object Util {
     }
   }
 
-  def decodeF[F[_] : HasError, A: Decoder](message: String): F[A] =
-    MonadError[F, Throwable].fromEither(decode[A](message))
+  def decodeF[F[_] : HasErrorA, A: Decoder](message: String): F[A] =
+    ApplicativeError[F, Throwable].fromEither(decode[A](message))
 
 }

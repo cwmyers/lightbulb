@@ -4,7 +4,7 @@ import java.nio.charset.StandardCharsets
 
 import app.Communication.{getStatusTopic, publishCommand, publishMessageToMqtt}
 import app.Util.toHex
-import app.codecs.DpsCodec
+import app.codecs.Codecs
 import app.model.{Lightbulb, Structure}
 import app.mqtt.MqttApi.createMessageF
 import app.tuya.Transport.processF
@@ -15,7 +15,7 @@ import io.circe.generic.auto._
 import org.eclipse.paho.client.mqttv3.{MqttClient, MqttMessage}
 
 
-trait Commands[F[_]] extends DpsCodec {
+trait Commands[F[_]] extends Codecs {
 
 
   def handleRgbMessage(l: Lightbulb, mqttClient: MqttClient)(implicit F:Sync[F]): (String, MqttMessage) => F[Unit] =

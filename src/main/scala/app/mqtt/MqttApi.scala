@@ -1,6 +1,6 @@
 package app.mqtt
 
-import app.tuya.Transport.HasError
+import app.tuya.Transport.HasErrorA
 import cats.implicits._
 import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence
 import org.eclipse.paho.client.mqttv3.{MqttClient, MqttConnectOptions, MqttMessage}
@@ -10,8 +10,8 @@ object MqttApi {
   def createClient(clientId: String): Either[Throwable, MqttClient] =
     createClientF[Either[Throwable, ?]](clientId)
 
-  def createClientF[F[_] : HasError](clientId: String): F[MqttClient] =
-    implicitly[HasError[F]].catchNonFatal {
+  def createClientF[F[_] : HasErrorA](clientId: String): F[MqttClient] =
+    implicitly[HasErrorA[F]].catchNonFatal {
       val broker = "tcp://192.168.1.198:1883"
       val persistence: MemoryPersistence = new MemoryPersistence()
       val mqttClient = new MqttClient(broker, clientId, persistence)
@@ -28,8 +28,8 @@ object MqttApi {
   def createMessage(message: String, retained: Boolean = true): Either[Throwable, MqttMessage] =
     createMessageF[Either[Throwable, ?]](message, retained)
 
-  def createMessageF[F[_] : HasError](message: String, retained: Boolean = true): F[MqttMessage] =
-    implicitly[HasError[F]].catchNonFatal {
+  def createMessageF[F[_] : HasErrorA](message: String, retained: Boolean = true): F[MqttMessage] =
+    implicitly[HasErrorA[F]].catchNonFatal {
       val m = new MqttMessage(message.getBytes)
       m.setRetained(true)
       m
