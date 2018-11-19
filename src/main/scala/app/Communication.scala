@@ -8,8 +8,8 @@ import app.mqtt.MqttApi
 import app.tuya.Protocol.createTuyaMessage
 import app.tuya.Transport.encryptMessageF
 import cats.effect.Sync
-import org.eclipse.paho.client.mqttv3.{MqttClient, MqttMessage}
 import cats.implicits._
+import org.eclipse.paho.client.mqttv3.{MqttClient, MqttMessage}
 
 object Communication {
   def publishMessageToMqtt[F[_] : Sync](mqttClient: MqttClient, topic: String)(message: MqttMessage): F[Unit] = {

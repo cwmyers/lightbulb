@@ -26,7 +26,11 @@ object Main extends Codecs {
       _ <- config.lightbulbs.traverse[Eff, Unit] { l => wireUpListeners(l, mqttClient) }
     } yield ()
 
-    program.unsafeRunSync()
+    try {
+      program.unsafeRunSync()
+    } catch {
+      case e: Throwable => println(e.getMessage)
+    }
 
   }
 

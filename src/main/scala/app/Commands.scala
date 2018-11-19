@@ -3,7 +3,7 @@ package app
 import java.nio.charset.StandardCharsets
 
 import app.Communication.{getStatusTopic, publishCommand, publishMessageToMqtt}
-import app.Util.toHex
+import app.Util.{toHex, _}
 import app.codecs.Codecs
 import app.model.{Lightbulb, Structure}
 import app.mqtt.MqttApi.createMessageF
@@ -61,7 +61,7 @@ trait Commands[F[_]] extends Codecs {
         _ <- publishMessageToMqtt[F](mqttClient, s"$statusTopic/rgb")(message)
       } yield ()
 
-      onStatus *> colourStatus
+      onStatus.recover *> colourStatus
     }
 
   private def processColour(colourValue: String)(implicit F:Sync[F]): F[MqttMessage] = {

@@ -4,8 +4,8 @@ import java.nio.charset.StandardCharsets
 import java.util.Base64
 
 import app.model.LocalKey
-import cats.{ApplicativeError, MonadError}
 import cats.implicits._
+import cats.{ApplicativeError, MonadError}
 
 
 object Transport {
@@ -48,25 +48,8 @@ object Transport {
       new String(decVal, StandardCharsets.UTF_8)
     }
 
-  def byte2hex(b: Array[Byte]): String = {
-    var hs = ""
-    var stmp = ""
-    var n = 0
-    while ( {
-      n < b.length
-    }) {
-      stmp = Integer.toHexString(b(n) & 255)
-      if (stmp.length == 1) hs = hs + "0" + stmp
-      else hs = hs + stmp
-
-      {
-        n += 1
-        n
-      }
-    }
-    hs.toUpperCase
-  }
-
+  def byte2hex(b: Array[Byte]): String =
+    b.map("%02X".format(_)).mkString.toUpperCase
 
   def digest[F[_] : HasErrorA](message: String): F[String] =
     implicitly[HasErrorA[F]].catchNonFatal {
