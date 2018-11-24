@@ -12,13 +12,13 @@ import cats.ApplicativeError.liftFromOption
 import cats.effect.Sync
 import cats.implicits._
 import io.circe.generic.auto._
-import org.eclipse.paho.client.mqttv3.{MqttClient, MqttMessage}
+import org.eclipse.paho.client.mqttv3.{MqttAsyncClient, MqttMessage}
 
 
 trait Commands[F[_]] extends Codecs {
 
 
-  def handleRgbMessage(l: Lightbulb, mqttClient: MqttClient)(implicit F:Sync[F]): (String, MqttMessage) => F[Unit] =
+  def handleRgbMessage(l: Lightbulb, mqttClient: MqttAsyncClient)(implicit F:Sync[F]): (String, MqttMessage) => F[Unit] =
     (_: String, message: MqttMessage) => {
       val status = new String(message.getPayload)
       println(status)
@@ -31,7 +31,7 @@ trait Commands[F[_]] extends Codecs {
     }
 
 
-  def handleOnMessages(lightbulb: Lightbulb, mqttClient: MqttClient)(implicit F:Sync[F]): (String, MqttMessage) => F[Unit] =
+  def handleOnMessages(lightbulb: Lightbulb, mqttClient: MqttAsyncClient)(implicit F:Sync[F]): (String, MqttMessage) => F[Unit] =
     (_: String, message: MqttMessage) => {
       val status = new String(message.getPayload)
       println(status)
@@ -40,7 +40,7 @@ trait Commands[F[_]] extends Codecs {
     }
 
 
-  def handleUpdateMessage(l: Lightbulb, mqttClient: MqttClient)(implicit F:Sync[F]): (String, MqttMessage) => F[Unit] =
+  def handleUpdateMessage(l: Lightbulb, mqttClient: MqttAsyncClient)(implicit F:Sync[F]): (String, MqttMessage) => F[Unit] =
     (_: String, message: MqttMessage) => {
       val currentState = new String(message.getPayload, StandardCharsets.UTF_8)
       val statusTopic = getStatusTopic(l.deviceId)

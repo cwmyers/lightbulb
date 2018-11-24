@@ -3,18 +3,18 @@ package app.mqtt
 import app.tuya.Transport.HasErrorA
 import cats.implicits._
 import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence
-import org.eclipse.paho.client.mqttv3.{MqttClient, MqttConnectOptions, MqttMessage}
+import org.eclipse.paho.client.mqttv3.{MqttAsyncClient, MqttConnectOptions, MqttMessage}
 
 object MqttApi {
 
-  def createClient(clientId: String): Either[Throwable, MqttClient] =
+  def createClient(clientId: String): Either[Throwable, MqttAsyncClient] =
     createClientF[Either[Throwable, ?]](clientId)
 
-  def createClientF[F[_] : HasErrorA](clientId: String): F[MqttClient] =
+  def createClientF[F[_] : HasErrorA](clientId: String): F[MqttAsyncClient] =
     implicitly[HasErrorA[F]].catchNonFatal {
       val broker = "tcp://192.168.1.198:1883"
       val persistence: MemoryPersistence = new MemoryPersistence()
-      val mqttClient = new MqttClient(broker, clientId, persistence)
+      val mqttClient = new MqttAsyncClient(broker, clientId, persistence)
       val connOpts = new MqttConnectOptions()
       connOpts.setCleanSession(true)
       connOpts.setAutomaticReconnect(true)

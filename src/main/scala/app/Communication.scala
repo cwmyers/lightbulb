@@ -9,10 +9,10 @@ import app.tuya.Protocol.createTuyaMessage
 import app.tuya.Transport.encryptMessageF
 import cats.effect.Sync
 import cats.implicits._
-import org.eclipse.paho.client.mqttv3.{MqttClient, MqttMessage}
+import org.eclipse.paho.client.mqttv3.{MqttAsyncClient, MqttMessage}
 
 object Communication {
-  def publishMessageToMqtt[F[_] : Sync](mqttClient: MqttClient, topic: String)(message: MqttMessage): F[Unit] = {
+  def publishMessageToMqtt[F[_] : Sync](mqttClient: MqttAsyncClient, topic: String)(message: MqttMessage): F[Unit] = {
     Sync[F].delay(
       mqttClient.publish(topic, message)
     )
@@ -30,7 +30,7 @@ object Communication {
     s"${getLightbridgeTopic(deviceId)}/command"
   }
 
-  def publishCommand[F[_]: Sync](lightbulb: Lightbulb, client: MqttClient, message: String): F[Unit] = {
+  def publishCommand[F[_]: Sync](lightbulb: Lightbulb, client: MqttAsyncClient, message: String): F[Unit] = {
     for {
       m <- readyToSend[F](lightbulb, message)
       mqttMessage <- MqttApi.createMessageF[F](m, retained = false)

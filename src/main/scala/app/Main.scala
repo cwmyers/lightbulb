@@ -8,7 +8,7 @@ import app.mqtt.MqttApi.createClientF
 import cats.effect.{IO, Sync}
 import cats.implicits._
 import io.circe.generic.auto._
-import org.eclipse.paho.client.mqttv3.MqttClient
+import org.eclipse.paho.client.mqttv3.MqttAsyncClient
 
 import scala.io.Source
 
@@ -34,7 +34,7 @@ object Main extends Codecs {
 
   }
 
-  def wireUpListeners(l: Lightbulb, mqttClient: MqttClient): IO[Unit] = {
+  def wireUpListeners(l: Lightbulb, mqttClient: MqttAsyncClient): IO[Unit] = {
     object Commands extends Commands[IO]
 
     import Commands._
